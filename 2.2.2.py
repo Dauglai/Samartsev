@@ -3,6 +3,58 @@ import math
 from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side
 from openpyxl.styles.numbers import BUILTIN_FORMATS
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+class generate_image:
+    def __init__(self, data_set, name):
+        self.name = name
+        self.years = list(data_set[0])
+        self.salaries = list(data_set[1])
+        self.prof_salaries = list(data_set[2])
+        self.number_vacancies = list(data_set[3])
+        self.prof_number_vacancies = list(data_set[4])
+        self.cities = list(map(lambda city: city.replace(" ","\n").replace("-","-\n"), data_set[5]))
+        self.cities_salaries = list(data_set[6])
+        self.other_cities = ["Другие"] + list(data_set[8])
+        self.shares_vacancies = list(data_set[9])
+
+
+    def generate(self):
+        figure, axes = plt.subplots(nrows=2, ncols=2, figsize=(8, 6))
+        salary_graph, number_vacancies_graph, cities_salaries_graph, shares_vacancies_graph = axes.flatten()
+
+        self.tune_diagram(salary_graph, self.salaries, self.prof_salaries, 'Уровень зарплат по годам', 'средняя з/п', 'з/п ')
+        self.tune_diagram(number_vacancies_graph, self.number_vacancies, self.prof_number_vacancies, 'Количество вакансий по годам', 'Количество вакансий', 'Количество вакансий\n')
+
+        cities_position = np.arange(len(self.cities))
+        cities_salaries_graph.barh(cities_position, self.cities_salaries)
+        cities_salaries_graph.set_yticks(cities_position)
+        cities_salaries_graph.set_yticklabels(self.cities, fontsize=6, verticalalignment="center", horizontalalignment="right")
+        cities_salaries_graph.invert_yaxis()
+        cities_salaries_graph.set_title('Уровень зарплат по городам')
+        cities_salaries_graph.grid(axis='x')
+
+        shares = [1-sum(self.shares_vacancies)] + self.shares_vacancies
+        shares_vacancies_graph.pie(shares, labels=self.other_cities, textprops={'fontsize': 6})
+        shares_vacancies_graph.tick_params(labelsize=6)
+        shares_vacancies_graph.set_title('Доля вакансий по городам')
+
+        figure.tight_layout()
+        plt.show()
+        figure.savefig('graph.png')
+
+    def tune_diagram(self, ax, values, prof_values, title, name_bar, other_name):
+        width = 0.35
+        years_position = np.arange(len(self.years))
+        ax.set_title(title)
+        ax.bar(years_position - width / 2, values, width, label=name_bar)
+        ax.bar(years_position + width / 2, prof_values, width, label=other_name + self.name)
+        ax.set_xticks(years_position, self.years, rotation=90)
+        ax.tick_params(labelsize=8)
+        ax.grid(axis='y')
+        ax.legend(fontsize=8)
 
 
 class generate_excel:
@@ -17,8 +69,8 @@ class generate_excel:
         cities_statistic_sheet = work_book.create_sheet("Статистика по городам", 1)
         years_titles = ["Год", "Средняя зарплата", f"Средняя зарплата - {self.name}", "Количество вакансий", f"Количество вакансий - {self.name}"]
         cities_titles = ["Город", "Уровень зарплат", "", "Город", "Доля вакансий"]
-        years_tab = report(years_titles, self.data_set[:5], years_statistic_sheet)
-        cities_tab = report(cities_titles, self.data_set[5:], cities_statistic_sheet)
+        years_tab = Sheet(years_titles, self.data_set[:5], years_statistic_sheet)
+        cities_tab = Sheet(cities_titles, self.data_set[5:], cities_statistic_sheet)
         years_tab.fill_tab()
         years_tab.set_border(f"A1:E{len(self.data_set[0]) + 1}")
         cities_tab.do_percent_style(range(2, 12))
@@ -28,7 +80,7 @@ class generate_excel:
         work_book.save('report.xlsx')
 
 
-class report:
+class Sheet:
     def __init__(self, titles, data, sheet):
         self.titles = titles
         self.data = data
@@ -59,7 +111,7 @@ class report:
             self.sheet[f"E{number}"].number_format = BUILTIN_FORMATS[10]
 
 
-class DataSet:
+class report:
     def __init__(self, file_name, profession_name):
         self.file_name = file_name
         self.profession_name = profession_name
@@ -174,7 +226,14 @@ class Vacancy:
 
 file_name = input("Введите название файла: ")
 profession_name = input("Введите название профессии: ")
-data = DataSet(file_name, profession_name)
+program = input("Вывод на экран (таблица/график): ")
+data = report(file_name, profession_name)
 data_set = data.print_set_info()
-excel = generate_excel(data_set, profession_name)
-excel.generate()
+
+if program == "таблица":
+    excel = generate_excel(data_set, profession_name)
+    excel.generate()
+if program == "график":
+    graph = generate_image(data_set, profession_name)
+    graph.generate()
+
